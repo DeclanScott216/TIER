@@ -15,7 +15,7 @@ workflows:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
-        api_key: App Manager
+        api_key: TIER
         key_id: AJ2QSY34B9
         issuer_id: d3ffa311-f124-4a74-b0ad-e4884a873c75
         submit_to_testflight: true
