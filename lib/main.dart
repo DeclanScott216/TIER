@@ -4,11 +4,12 @@ import 'pages/schedule.dart';
 import 'pages/dbt_page.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(TierApp());
+  runApp(const TierApp());
 }
 
 class TierApp extends StatefulWidget {
+  const TierApp({super.key});
+
   @override
   State<TierApp> createState() => _TierAppState();
 }
@@ -17,8 +18,6 @@ class _TierAppState extends State<TierApp> {
   int _selectedIndex = 0;
   int _mood = 5;
 
-  void _onMoodChanged(int m) => setState(() => _mood = m);
-
   late final List<Widget> _pages;
 
   @override
@@ -26,10 +25,47 @@ class _TierAppState extends State<TierApp> {
     super.initState();
     _pages = [
       HomePage(onMoodChanged: _onMoodChanged),
-      SchedulePage(),
-      DbtPage(),
+      const SchedulePage(),
+      const DbtPage(),
     ];
   }
 
+  void _onMoodChanged(int m) {
+    setState(() {
+      _mood = m;
+    });
+  }
+
   void _onTap(int idx) {
-    s
+    setState(() {
+      _selectedIndex = idx;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'TIER',
+      theme: ThemeData(
+        primarySwatch: Colors.deepPurple,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('TIER'),
+          centerTitle: true,
+        ),
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onTap,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Schedule'),
+            BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'DBT'),
+          ],
+        ),
+      ),
+    );
+  }
+}
