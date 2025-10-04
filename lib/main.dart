@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 import 'pages/home.dart';
 import 'pages/schedule.dart';
 import 'pages/dbt_page.dart';
+// Import your crash reporting package, e.g. Firebase Crashlytics
+// import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize crash reporting (example for Firebase Crashlytics)
+  // await Firebase.initializeApp();
+  // FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+
   runApp(TierApp());
 }
 
@@ -45,7 +55,7 @@ class _TierAppState extends State<TierApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('TIER'),
-          centerTitle: true, // optional: keep title centered
+          centerTitle: true,
         ),
         body: _pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
