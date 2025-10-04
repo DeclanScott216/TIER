@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'pages/home.dart';
 import 'pages/schedule.dart';
 import 'pages/dbt_page.dart';
-// Import your crash reporting package, e.g. Firebase Crashlytics
-// import 'package:firebase_core/firebase_core.dart';
-// import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 Future<void> main() async {
-  // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize crash reporting (example for Firebase Crashlytics)
-  // await Firebase.initializeApp();
-  // FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
+  // Pass all uncaught errors from Flutter to Crashlytics
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  // Optional: Catch errors from outside Flutter (e.g., native crashes)
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   runApp(TierApp());
 }
