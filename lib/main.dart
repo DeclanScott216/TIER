@@ -1,6 +1,8 @@
+import 'dart:ui'; // ✅ Needed for PlatformDispatcher
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'firebase_options.dart'; // Make sure you have this file from FlutterFire CLI
 import 'pages/home.dart';
 import 'pages/schedule.dart';
 import 'pages/dbt_page.dart';
@@ -9,21 +11,25 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // Pass all uncaught errors from Flutter to Crashlytics
+  // Catch all uncaught Flutter errors
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-  // Optional: Catch errors from outside Flutter (e.g., native crashes)
+  // Catch errors from outside Flutter (native errors)
   PlatformDispatcher.instance.onError = (error, stack) {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
+    return true; // Prevent app from crashing immediately
   };
 
-  runApp(TierApp());
+  runApp(const TierApp());
 }
 
 class TierApp extends StatefulWidget {
+  const TierApp({super.key});
+
   @override
   State<TierApp> createState() => _TierAppState();
 }
