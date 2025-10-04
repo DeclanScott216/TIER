@@ -1,21 +1,36 @@
 workflows:
   ios-testflight:
-    name: iOS TestFlight Build
-    max_build_duration: 60
+    name: iOS TestFlight Workflow
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Get dependencies
-        script: flutter pub get
+      - name: Install dependencies
+        script: |
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
       - name: Build iOS
-        script: flutter build ipa --release --no-codesign
+        script: |
+          flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
-        api_key: TIER
-        key_id: AJ2QSY34B9
-        issuer_id: d3ffa311-f124-4a74-b0ad-e4884a873c75
-        submit_to_testflight: true
+        apple_id: $APP_STORE_CONNECT_ISSUER_ID
+        api_key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
+
+  android-release:
+    name: Android Release Workflow
+    environment:
+      flutter: stable
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+      - name: Build Android APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
