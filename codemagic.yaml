@@ -4,33 +4,19 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      vars:
-        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)
-        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)
-        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
     scripts:
       - name: Install Flutter dependencies
         script: flutter pub get
       - name: Prepare iOS build environment
         script: |
-          # Force Flutter to cache iOS artifacts
-          rm -rf $FLUTTER_ROOT/bin/cache
-          flutter precache --ios
-
-          # Clean previous build artifacts
           flutter clean
+          flutter pub get
+          flutter precache --ios
           rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.podspec
-
-          # Ensure iOS deployment target >= 13
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
-
-          # Update CocoaPods repo
-          cd ios
-          pod repo update
-          pod install
-          cd ..
       - name: Build iOS IPA
-        script: flutter build ipa --release --no-codesign
+        script: |
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
+          flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
@@ -50,3 +36,4 @@ workflows:
         script: flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
+
