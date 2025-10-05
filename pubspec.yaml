@@ -1,40 +1,28 @@
-name: tier_companion
-description: Elitelywell's TIER brought to the appstore.
-publish_to: 'none'
-version: 1.0.0+4   # 1.0.0 is CFBundleShortVersionString, +3 is CFBundleVersion
+name: tier_flutter
+description: A new Flutter project.
+publish_to: "none"
+
+version: 1.0.0+1
 
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.2
-  shared_preferences: ^2.2.3
-  intl: ^0.20.2
-  uuid: ^4.3.3
-  http: ^1.5.0
-  url_launcher: ^6.3.0
-  change_app_package_name: ^1.5.0
 
-  # Firebase dependencies
-  firebase_core: ^4.1.1
-  firebase_crashlytics: ^5.0.2
+  cupertino_icons: ^1.0.6
+  # Add your other dependencies below this line
+  # e.g. http: ^1.2.0
+  # shared_preferences: ^2.3.2
 
 dev_dependencies:
-  flutter_launcher_icons: ^0.14.4
-  flutter_native_splash: ^2.4.0
-
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "assets/lotus_transparent.png"       # your lotus-only version
-  adaptive_icon_background: "#EAF6F6" # soft background from logo
-  adaptive_icon_foreground: "assets/lotus_transparent.png"
-
-flutter_native_splash:
-  color: "#EAF6F6"                # background color
-  image: "assets/lotus_transparent.png"          # your logo file
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
+  # If you have assets, keep them here
+  assets:
+    - assets/
