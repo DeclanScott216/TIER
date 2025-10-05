@@ -1,28 +1,33 @@
 workflows:
   ios-testflight:
-    name: iOS TestFlight Build
+    name: iOS TestFlight Workflow
     environment:
-      groups:
-        - appstore_credentials
       flutter: stable
-      xcode: 16.4
-      cocoapods: 1.16.2
+      xcode: latest
     scripts:
-      - name: Clean Flutter and Pod cache
-        script: |
-          flutter clean
-          flutter pub get
-          rm -rf ios/Pods ios/Podfile.lock
-          pod repo update
+      - name: Install Flutter dependencies
+        script: flutter pub get
       - name: Build iOS IPA
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          # Ensure iOS deployment target >=13
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
+          flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
-        key_identifier: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        submit_to_testflight: true
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+
+  android-release:
+    name: Android Release Workflow
+    environment:
+      flutter: stable
+    scripts:
+      - name: Install Flutter dependencies
+        script: flutter pub get
+      - name: Build Android APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
