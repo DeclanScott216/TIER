@@ -5,19 +5,19 @@ workflows:
       flutter: stable
       xcode: latest
     scripts:
-      - name: Prepare iOS build environment
+      - name: Prepare Flutter & iOS
         script: |
           flutter clean
           flutter pub get
           flutter precache --ios
           rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.podspec
           sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
-      - name: Install Pods
+      - name: Install CocoaPods
         script: |
           cd ios
           pod install --repo-update
           cd ..
-      - name: Build iOS IPA
+      - name: Build IPA
         script: flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
@@ -38,5 +38,3 @@ workflows:
         script: flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
-
-
