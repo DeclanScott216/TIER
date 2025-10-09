@@ -1,20 +1,31 @@
-# Podfile stub for non-macOS local development
-# Codemagic will run this on macOS and generate the real pods
-
+# Uncomment this line to define a global platform for your project
 platform :ios, '12.0'
 
 use_frameworks!
 use_modular_headers!
 
-# Only load Flutter podhelper if it exists (Codemagic will have it)
+# Flutter root path
 flutter_application_path = '../'
-podhelper_path = File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
 
-if File.exist?(podhelper_path)
-  eval(File.read(podhelper_path), binding)
-else
-  # Minimal fallback to avoid crashes
-  target 'Runner' do
-    pod 'Flutter', :path => File.join(flutter_application_path, 'bin', 'cache', 'artifacts', 'engine', 'ios')
+# Load Flutter's podhelper
+load File.join(flutter_application_path, '.ios', 'Flutter', 'podhelper.rb')
+
+target 'Runner' do
+  flutter_ios_podfile_setup
+
+  use_frameworks!
+  use_modular_headers!
+
+  pod 'Firebase/Core', :modular_headers => true
+  pod 'Firebase/Messaging', :modular_headers => true
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
   end
 end
