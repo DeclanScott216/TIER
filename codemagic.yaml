@@ -1,40 +1,35 @@
 workflows:
-  ios-testflight:
-    name: iOS TestFlight Workflow
+  ios-release:
+    name: iOS Release Build
+    max_build_duration: 60
     environment:
       flutter: stable
-      xcode: latest
+      xcode: 16.4
+      cocoapods: 1.15.2
+      vars:
+        BUNDLE_ID: "com.elitelywell.tier"
+        APP_NAME: "TIER Companion"
     scripts:
-      - name: Prepare Flutter & iOS
+      - name: Install dependencies
         script: |
           flutter clean
           flutter pub get
           flutter precache --ios
-          rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.podspec
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '13.0'/" ios/Podfile || true
-      - name: Install CocoaPods
-        script: |
           cd ios
-          pod install --repo-update
+          rm -rf Podfile.lock Pods
+          pod repo update
+          pod install
           cd ..
+
       - name: Build IPA
-        script: flutter build ipa --release --no-codesign
+        script: |
+          flutter build ipa --release --no-codesign
+
     artifacts:
       - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+      - build/ios/archive/*.xcarchive
 
-  android-release:
-    name: Android Release Workflow
-    environment:
-      flutter: stable
-    scripts:
-      - name: Install Flutter dependencies
-        script: flutter pub get
-      - name: Build Android APK
-        script: flutter build apk --release
-    artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
+    publishing:
+      email:
+        recipients:
+          - dwscott216@gmail.com
