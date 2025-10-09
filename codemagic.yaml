@@ -11,24 +11,33 @@ workflows:
     scripts:
       - name: Prebuild setup
         script: |
-          echo "=== Checking Flutter setup ==="
+          echo "=== Flutter doctor ==="
           flutter doctor -v
-          
+          echo "=== Flutter clean ==="
+          flutter clean
+          echo "=== Get Flutter packages ==="
+          flutter pub get
           echo "=== Precache iOS engine ==="
           flutter precache --ios
           
-          echo "=== Get Flutter packages ==="
-          flutter pub get
+          echo "=== Check podhelper.rb exists ==="
+          if [ ! -f ios/.ios/Flutter/podhelper.rb ]; then
+            echo "⚠️ podhelper.rb not found, forcing flutter pub get and precache again"
+            flutter pub get
+            flutter precache --ios
+          fi
           
           echo "=== Install iOS pods ==="
           cd ios
-          pod install --repo-update
+          pod cache clean --all
+          pod repo update
+          pod install --verbose || pod install --verbose
           cd ..
           
       - name: Build iOS IPA (Verbose)
         script: |
-          echo "=== Building iOS IPA Verbose ==="
-          flutter build ipa -v --release --no-codesign
-          
+          echo "=== Building iOS app IPA ==="
+          flutter build ipa --release --no-codesign -v
+
     artifacts:
       - build/ios/ipa/*.ipa
