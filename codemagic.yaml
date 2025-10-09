@@ -6,12 +6,11 @@ workflows:
       flutter: stable
       xcode: 16.4
       cocoapods: 1.15.2
-      vars:
-        BUNDLE_ID: "com.elitelywell.tier"
-        APP_NAME: "TIER Companion"
     scripts:
-      - name: Install dependencies
+      - name: Pre-build setup
         script: |
+          set -e
+          flutter --version
           flutter clean
           flutter pub get
           flutter precache --ios
@@ -21,15 +20,10 @@ workflows:
           pod install
           cd ..
 
-      - name: Build IPA
+      - name: Build IPA (no codesign)
         script: |
           flutter build ipa --release --no-codesign
 
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/archive/*.xcarchive
-
-    publishing:
-      email:
-        recipients:
-          - dwscott216@gmail.com
