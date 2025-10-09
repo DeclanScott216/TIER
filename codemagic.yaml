@@ -2,28 +2,39 @@ workflows:
   ios_testflight:
     name: iOS TestFlight Build
     max_build_duration: 60
-    instance_type: mac_mini_m1
     environment:
-      vars:
-        PRIVATE_KEY: Encrypted(...)
-        KEY_ID: Encrypted(...)
-        ISSUER_ID: Encrypted(...)
-        APP_STORE_CONNECT_APPLE_ID: Encrypted(...)
       flutter: stable
-      xcode: "16.4"
+      xcode: latest
+      groups:
+        - app_store_connect_credentials  # references the variable group you created
+      vars:
+        XCODE_SCHEME: "Runner"
+
     scripts:
-      - name: Install CocoaPods
+      - name: Install dependencies
         script: |
-          brew install cocoapods || true
-          pod install --project-directory=ios
-      - name: Get dependencies
-        script: flutter pub get
+          echo "🧹 Cleaning and getting packages..."
+          flutter clean
+          flutter pub get
+          cd ios
+          pod repo update
+          pod install
+          cd ..
+
       - name: Build IPA
-        script: flutter build ipa --release --no-codesign
-      - name: Code sign IPA
         script: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file build/ios/ipa/Runner.ipa \
-            --apiKey $KEY_ID \
-            --apiIssuer $ISSUER_ID
+          echo "📦 Building iOS IPA..."
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      - name: Publish to TestFlight
+        script: |
+          echo "🚀 Uploading to TestFlight..."
+          app-store-connect publish \
+            --path build/ios/ipa/*.ipa \
+            --api-key-id "$KEY_ID" \
+            --api-issuer-id "$ISSUER_ID" \
+            --api-private-key "$PRIVATE_KEY" \
+            --apple-id "$APP_STORE_CONNECT_APPLE_ID"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
