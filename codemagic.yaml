@@ -24,7 +24,7 @@ workflows:
       - name: Build IPA
         script: |
           echo "📦 Building iOS IPA..."
-          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+          flutter build ipa --release
 
       - name: Publish to TestFlight
         script: |
