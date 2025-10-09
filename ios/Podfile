@@ -16,9 +16,6 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  pod 'Firebase/Core', :modular_headers => true
-  pod 'Firebase/Messaging', :modular_headers => true
-
   target 'RunnerTests' do
     inherit! :search_paths
   end
