@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - AppStoreConnect  # group contains PRIVATE_KEY, KEY_ID, ISSUER_ID, APP_STORE_CONNECT_APPLE_ID
+        - AppStoreConnect  # contains PRIVATE_KEY, KEY_ID, ISSUER_ID, APP_STORE_CONNECT_APPLE_ID
       vars:
         XCODE_SCHEME: "Runner"
 
@@ -24,10 +24,11 @@ workflows:
       - name: Code signing setup
         script: |
           echo "🔐 Setting up automatic iOS code signing..."
+          # The app-store-connect tool now reads credentials from env vars
+          export APP_STORE_CONNECT_API_KEY_ID="$KEY_ID"
+          export APP_STORE_CONNECT_API_ISSUER_ID="$ISSUER_ID"
+          export APP_STORE_CONNECT_PRIVATE_KEY="$PRIVATE_KEY"
           app-store-connect fetch-signing-files \
-            --api-key-id "$KEY_ID" \
-            --api-issuer-id "$ISSUER_ID" \
-            --api-private-key "$PRIVATE_KEY" \
             --type IOS_APP_STORE \
             --create
 
@@ -39,12 +40,13 @@ workflows:
       - name: Publish to TestFlight
         script: |
           echo "🚀 Uploading to TestFlight..."
+          export APP_STORE_CONNECT_API_KEY_ID="$KEY_ID"
+          export APP_STORE_CONNECT_API_ISSUER_ID="$ISSUER_ID"
+          export APP_STORE_CONNECT_PRIVATE_KEY="$PRIVATE_KEY"
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
-            --api-key-id "$KEY_ID" \
-            --api-issuer-id "$ISSUER_ID" \
-            --api-private-key "$PRIVATE_KEY" \
-            --apple-id "$APP_STORE_CONNECT_APPLE_ID"
+            --apple-id "$APP_STORE_CONNECT_APPLE_ID" \
+            --submit-to-testflight
 
     artifacts:
       - build/ios/ipa/*.ipa
