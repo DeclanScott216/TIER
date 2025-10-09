@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - AppStoreConnect  # references the variable group you created
+        - AppStoreConnect  # group contains PRIVATE_KEY, KEY_ID, ISSUER_ID, APP_STORE_CONNECT_APPLE_ID
       vars:
         XCODE_SCHEME: "Runner"
 
@@ -20,6 +20,16 @@ workflows:
           pod repo update
           pod install
           cd ..
+
+      - name: Code signing setup
+        script: |
+          echo "🔐 Setting up automatic iOS code signing..."
+          app-store-connect fetch-signing-files \
+            --api-key-id "$KEY_ID" \
+            --api-issuer-id "$ISSUER_ID" \
+            --api-private-key "$PRIVATE_KEY" \
+            --type IOS_APP_STORE \
+            --create
 
       - name: Build IPA
         script: |
