@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - app_store_connect_credentials  # references the variable group you created
+        - AppStoreConnect  # references the variable group you created
       vars:
         XCODE_SCHEME: "Runner"
 
