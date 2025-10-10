@@ -21,15 +21,14 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode Base64 private key safely and fix line endings
-          echo "$PRIVATE_KEY" | tr -d '\r\n' | base64 --decode > /tmp/AuthKey.p8
-          echo "" >> /tmp/AuthKey.p8  # ensure trailing newline
+          # Decode Base64 private key correctly
+          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
+          echo "" >> /tmp/AuthKey.p8  # ensure newline at end
 
           # Optional verification
           echo "Verifying private key header:"
           head -n 6 /tmp/AuthKey.p8
 
-          # Debug: show variables
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
@@ -44,9 +43,6 @@ workflows:
             --create
       - name: Build IPA
         script: |
-          #!/usr/bin/env bash
-          set -e
-          echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
