@@ -5,32 +5,24 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      groups:
-        - AppStoreConnect
       vars:
         XCODE_SCHEME: "Runner"
-        BUNDLE_ID: "com.elitelywell.tier"
 
     scripts:
       - name: Install dependencies
         script: |
-          echo "🧹 Cleaning and preparing Flutter environment..."
+          echo "🧹 Cleaning and getting packages..."
           flutter clean
           flutter pub get
-
-          echo "⚙️ Rebuilding Flutter iOS artifacts..."
-          flutter precache --ios
-
-          echo "📦 Installing CocoaPods..."
           cd ios
           pod repo update
           pod install
           cd ..
 
-      - name: Code signing setup
+      - name: Setup automatic code signing
         script: |
           echo "🔐 Setting up automatic iOS code signing..."
-          echo "$PRIVATE_KEY" > /tmp/AuthKey.p8
+          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -49,11 +41,12 @@ workflows:
           echo "🚀 Uploading to TestFlight..."
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
-            --issuer-id "$ISSUER_ID" \
-            --key-id "$KEY_ID" \
-            --private-key /tmp/AuthKey.p8 \
+            --api-key-id "$KEY_ID" \
+            --api-issuer-id "$ISSUER_ID" \
+            --api-private-key /tmp/AuthKey.p8 \
             --apple-id "$APP_STORE_CONNECT_APPLE_ID"
 
     artifacts:
       - build/ios/ipa/*.ipa
+
 
