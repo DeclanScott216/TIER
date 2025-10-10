@@ -6,10 +6,13 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - AppStoreConnect  # references your variable group
+        - AppStoreConnect
       vars:
-        XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.elitelywell.tier"
+        PRIVATE_KEY: $PRIVATE_KEY
+        KEY_ID: $KEY_ID
+        ISSUER_ID: $ISSUER_ID
+        APP_STORE_CONNECT_APPLE_ID: $APP_STORE_CONNECT_APPLE_ID
 
     scripts:
       - name: Install dependencies
@@ -28,7 +31,7 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode Base64 private key safely
+          # Decode Base64 private key safely and fix line endings
           echo "$PRIVATE_KEY" | tr -d '\r\n' | base64 --decode > /tmp/AuthKey.p8
           echo "" >> /tmp/AuthKey.p8  # ensure trailing newline
 
@@ -42,3 +45,27 @@ workflows:
 
           # Fetch signing files automatically
           app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --issuer-id "$ISSUER_ID" \
+            --key-id "$KEY_ID" \
+            --private-key /tmp/AuthKey.p8 \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Build IPA
+        script: |
+          echo "📦 Building iOS IPA..."
+          flutter build ipa --release
+
+      - name: Publish to TestFlight
+        script: |
+          echo "🚀 Uploading to TestFlight..."
+          app-store-connect publish \
+            --path build/ios/ipa/*.ipa \
+            --api-key-id "$KEY_ID" \
+            --api-issuer-id "$ISSUER_ID" \
+            --api-private-key "$PRIVATE_KEY" \
+            --apple-id "$APP_STORE_CONNECT_APPLE_ID"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
