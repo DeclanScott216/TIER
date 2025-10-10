@@ -49,7 +49,3 @@ workflows:
           flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        apple_id: $APP_STORE_CONNECT_APPLE_ID
-        itc_team_id: $ISSUER_ID
