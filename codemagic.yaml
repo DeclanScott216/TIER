@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - AppStoreConnect  # make sure this group includes KEY_ID, ISSUER_ID, PRIVATE_KEY, APP_STORE_CONNECT_APPLE_ID
+        - AppStoreConnect
       vars:
         XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.elitelywell.tier"
@@ -14,9 +14,14 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          echo "🧹 Cleaning and installing pods..."
+          echo "🧹 Cleaning and preparing Flutter environment..."
           flutter clean
           flutter pub get
+
+          echo "⚙️ Rebuilding Flutter iOS artifacts..."
+          flutter precache --ios
+
+          echo "📦 Installing CocoaPods..."
           cd ios
           pod repo update
           pod install
@@ -34,12 +39,10 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-          echo "✅ Signing files fetched successfully."
-
       - name: Build IPA
         script: |
           echo "📦 Building iOS IPA..."
-          flutter build ipa --release --no-codesign
+          flutter build ipa --release
 
       - name: Publish to TestFlight
         script: |
@@ -53,3 +56,4 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+
