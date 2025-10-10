@@ -6,15 +6,15 @@ workflows:
       flutter: stable
       xcode: latest
       groups:
-        - AppStoreConnect  # contains your KEY_ID, ISSUER_ID, PRIVATE_KEY, APP_STORE_CONNECT_APPLE_ID
+        - AppStoreConnect  # make sure this group includes KEY_ID, ISSUER_ID, PRIVATE_KEY, APP_STORE_CONNECT_APPLE_ID
       vars:
         XCODE_SCHEME: "Runner"
-        BUNDLE_ID: "com.elitelywell.tier"  # <-- Replace with your actual bundle ID if different
+        BUNDLE_ID: "com.elitelywell.tier"
 
     scripts:
       - name: Install dependencies
         script: |
-          echo "🧹 Cleaning and getting packages..."
+          echo "🧹 Cleaning and installing pods..."
           flutter clean
           flutter pub get
           cd ios
@@ -25,27 +25,30 @@ workflows:
       - name: Code signing setup
         script: |
           echo "🔐 Setting up automatic iOS code signing..."
-          export APP_STORE_CONNECT_API_KEY_ID="$KEY_ID"
-          export APP_STORE_CONNECT_API_ISSUER_ID="$ISSUER_ID"
-          export APP_STORE_CONNECT_PRIVATE_KEY="$PRIVATE_KEY"
+          echo "$PRIVATE_KEY" > /tmp/AuthKey.p8
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
+            --issuer-id "$ISSUER_ID" \
+            --key-id "$KEY_ID" \
+            --private-key /tmp/AuthKey.p8 \
             --type IOS_APP_STORE \
             --create
+
+          echo "✅ Signing files fetched successfully."
 
       - name: Build IPA
         script: |
           echo "📦 Building iOS IPA..."
-          flutter build ipa --release
+          flutter build ipa --release --no-codesign
 
       - name: Publish to TestFlight
         script: |
           echo "🚀 Uploading to TestFlight..."
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
-            --api-key-id "$KEY_ID" \
-            --api-issuer-id "$ISSUER_ID" \
-            --api-private-key "$PRIVATE_KEY" \
+            --issuer-id "$ISSUER_ID" \
+            --key-id "$KEY_ID" \
+            --private-key /tmp/AuthKey.p8 \
             --apple-id "$APP_STORE_CONNECT_APPLE_ID"
 
     artifacts:
