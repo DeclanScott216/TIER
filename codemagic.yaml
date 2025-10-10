@@ -8,6 +8,7 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+
     scripts:
       - name: Install dependencies
         script: |
@@ -15,25 +16,29 @@ workflows:
           cd ios
           pod install
           cd ..
+
       - name: Setup automatic code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode Base64 private key correctly
-          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
-          echo "" >> /tmp/AuthKey.p8  # ensure newline at end
+          # Decode Base64 private key and normalize line endings
+          echo "$PRIVATE_KEY" | base64 --decode | tr -d '\r' > /tmp/AuthKey.p8
 
-          # Optional verification
+          # Ensure file ends with a newline (Apple tools require it)
+          echo "" >> /tmp/AuthKey.p8
+
+          # Verify output
           echo "Verifying private key header:"
           head -n 6 /tmp/AuthKey.p8
 
+          # Debug info
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Fetch signing files automatically
+          # Fetch signing files
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -41,8 +46,14 @@ workflows:
             --private-key /tmp/AuthKey.p8 \
             --type IOS_APP_STORE \
             --create
+
       - name: Build IPA
         script: |
+          #!/usr/bin/env bash
+          set -e
+          echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
+
     artifacts:
       - build/ios/ipa/*.ipa
+
