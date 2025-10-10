@@ -1,39 +1,38 @@
 workflows:
-  ios_testflight:
-    name: iOS TestFlight Build
-    max_build_duration: 60
+  ios-release:
+    name: iOS App Store Build
     environment:
       flutter: stable
-      xcode: latest
-      groups:
-        - AppStoreConnect  # This is your variable group name if you use one
+      xcode: 16.4
+      cocoapods: default
       vars:
-        XCODE_SCHEME: "Runner"
-
+        BUNDLE_ID: com.elitelywell.tier
+      groups:
+        - AppStoreConnect
     scripts:
       - name: Install dependencies
         script: |
-          echo "🧹 Cleaning and installing dependencies..."
-          flutter clean
           flutter pub get
-          cd ios
-          pod repo update
-          pod install
-          cd ..
 
       - name: Setup automatic code signing
         script: |
+          #!/usr/bin/env bash
+          set -e
+
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode the Base64 private key and write it to a file
+          # Decode Base64 back into .p8 PEM file
           echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
-          # Confirm environment variables are loaded (optional for debugging)
+          # Optional: Verify the file looks right
+          echo "Checking decoded key header:"
+          head -n 5 /tmp/AuthKey.p8
+
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Fetch and create signing files automatically from App Store Connect
+          # Fetch and create signing files automatically
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -42,20 +41,11 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-      - name: Build IPA
+      - name: Flutter build IPA
         script: |
           echo "📦 Building iOS IPA..."
-          flutter build ipa --release --export-method app-store
-
-      - name: Publish to TestFlight
-        script: |
-          echo "🚀 Uploading to TestFlight..."
-          app-store-connect publish \
-            --path build/ios/ipa/*.ipa \
-            --api-key-id "$KEY_ID" \
-            --api-issuer-id "$ISSUER_ID" \
-            --api-private-key /tmp/AuthKey.p8 \
-            --apple-id "$APP_STORE_CONNECT_APPLE_ID"
+          flutter build ipa --release --no-codesign
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - flutter_drive.log
