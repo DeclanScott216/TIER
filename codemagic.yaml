@@ -25,25 +25,32 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Safely write the PEM key preserving line breaks
-          printf "%s\n" "$PRIVATE_KEY" > /tmp/AuthKey.p8
+          # Normalize line endings and remove trailing whitespace
+          echo "$PRIVATE_KEY" | sed 's/\r$//' | sed 's/[[:space:]]*$//' > /tmp/AuthKey.p8
 
-          # --- DEBUG: Verify formatting of private key ---
-          echo "First line of PEM key:"
-          head -n 1 /tmp/AuthKey.p8
-          echo "Last line of PEM key:"
-          tail -n 1 /tmp/AuthKey.p8
-          echo "Line count:"
+          # --- DEBUG INFORMATION ---
+          echo "🔹 First 3 lines of PEM key:"
+          head -n 3 /tmp/AuthKey.p8
+          echo "🔹 Last 3 lines of PEM key:"
+          tail -n 3 /tmp/AuthKey.p8
+          echo "🔹 Full line count:"
           wc -l /tmp/AuthKey.p8
-          echo "File type:"
+          echo "🔹 File type:"
           file /tmp/AuthKey.p8
+          echo "🔹 Show visible whitespace for first 5 lines:"
+          head -n 5 /tmp/AuthKey.p8 | sed -n l
+          echo "🔹 Hex dump of first 3 lines:"
+          head -n 3 /tmp/AuthKey.p8 | hexdump -C
+          echo "BUNDLE_ID: $BUNDLE_ID"
+          echo "ISSUER_ID: $ISSUER_ID"
+          echo "KEY_ID: $KEY_ID"
 
-          # Check BEGIN/END lines
-          if ! head -n 1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
+          # Validate BEGIN/END lines
+          if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
             echo "ERROR: PEM key does not start with BEGIN PRIVATE KEY"
             exit 1
           fi
-          if ! tail -n 1 /tmp/AuthKey.p8 | grep -q "END PRIVATE KEY"; then
+          if ! tail -n1 /tmp/AuthKey.p8 | grep -q "END PRIVATE KEY"; then
             echo "ERROR: PEM key does not end with END PRIVATE KEY"
             exit 1
           fi
