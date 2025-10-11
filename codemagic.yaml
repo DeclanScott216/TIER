@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect       # Variable group containing PRIVATE_KEY
+        - AppStoreConnect       # Must contain PRIVATE_KEY variable (multi-line)
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -29,20 +29,16 @@ workflows:
           printf "%s\n" "$PRIVATE_KEY" > /tmp/AuthKey.p8
 
           # --- DEBUG: Verify formatting of private key ---
-          echo "First and last lines of PEM key:"
+          echo "First line of PEM key:"
           head -n 1 /tmp/AuthKey.p8
+          echo "Last line of PEM key:"
           tail -n 1 /tmp/AuthKey.p8
-
-          echo "Line count of PEM key:"
+          echo "Line count:"
           wc -l /tmp/AuthKey.p8
-
-          echo "Showing visible whitespace for first 5 lines:"
-          head -n 5 /tmp/AuthKey.p8 | cat -A
-
           echo "File type:"
           file /tmp/AuthKey.p8
 
-          # Confirm BEGIN/END lines exactly match expected
+          # Check BEGIN/END lines
           if ! head -n 1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
             echo "ERROR: PEM key does not start with BEGIN PRIVATE KEY"
             exit 1
@@ -53,7 +49,7 @@ workflows:
           fi
           echo "PEM key format looks correct ✅"
 
-          # Fetch and create signing certificates & provisioning profiles
+          # Fetch signing certificates & provisioning profiles
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
