@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect   # contains BUNDLE_ID, PRIVATE_KEY (base64), ISSUER_ID, KEY_ID
+        - AppStoreConnect   # contains PRIVATE_KEY (base64), KEY_ID, ISSUER_ID, BUNDLE_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -24,32 +24,28 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          echo "🔹 Decoding PRIVATE_KEY into /tmp/AuthKey.p8"
+          # Decode base64 PRIVATE_KEY into a file
           echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
-          echo "🔹 Debug info for PEM key:"
-          echo "Full content of PEM key:"
+          # --- Debug info ---
+          echo "🔹 Full content of PEM key:"
           cat /tmp/AuthKey.p8
-          echo "First line:"
+          echo "🔹 First line:"
           head -n1 /tmp/AuthKey.p8
-          echo "Second line:"
-          head -n2 /tmp/AuthKey.p8 | tail -n1
-          echo "Third line:"
-          head -n3 /tmp/AuthKey.p8 | tail -n1
-          echo "Last 3 lines:"
-          tail -n3 /tmp/AuthKey.p8
-          echo "Line count:"
+          echo "🔹 Last line:"
+          tail -n1 /tmp/AuthKey.p8
+          echo "🔹 Line count:"
           wc -l /tmp/AuthKey.p8
-          echo "Show visible whitespace for all lines:"
+          echo "🔹 Show visible whitespace for all lines:"
           cat -n /tmp/AuthKey.p8 | sed -n l
-          echo "Hex dump of entire key:"
+          echo "🔹 Hex dump of key:"
           hexdump -C /tmp/AuthKey.p8
 
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Validate BEGIN/END lines
+          # Validate PEM format
           if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
             echo "ERROR: PEM key does not start with BEGIN PRIVATE KEY"
             exit 1
@@ -60,7 +56,7 @@ workflows:
           fi
           echo "PEM key format looks correct ✅"
 
-          echo "🔹 Running app-store-connect fetch-signing-files"
+          # Fetch signing certificates & provisioning profiles
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
