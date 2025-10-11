@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect   # Your variable group for BUNDLE_ID, ISSUER_ID, KEY_ID
+        - AppStoreConnect   # contains BUNDLE_ID, PRIVATE_KEY, ISSUER_ID, KEY_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -16,16 +16,16 @@ workflows:
           cd ios
           pod install
           cd ..
-      - name: Setup automatic code signing
+      - name: Setup automatic iOS code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
           
-          # Write private key from environment variable
+          # Write private key from environment variable to file
           printf "%s\n" "$PRIVATE_KEY" > /tmp/AuthKey.p8
 
-          # Debug info
+          # --- Debug output ---
           echo "🔹 First line of PEM key:"
           head -n1 /tmp/AuthKey.p8
           echo "🔹 Last line of PEM key:"
@@ -52,5 +52,7 @@ workflows:
       - build/ios/ipa/*.ipa
 
     publishing:
-      app_store_connect: {}
-
+      app_store_connect:
+        api_key: $PRIVATE_KEY
+        key_id: $KEY_ID
+        issuer_id: $ISSUER_ID
