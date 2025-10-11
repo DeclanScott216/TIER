@@ -4,46 +4,36 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect       # Must contain PRIVATE_KEY variable (multi-line)
+        - AppStoreConnect
       flutter: stable
       xcode: latest
       cocoapods: default
-      vars:
-        BUNDLE_ID: "com.elitelywell.tier"
-        ISSUER_ID: "d3ffa311-f124-4a74-b0ad-e4884a873c75"
-        KEY_ID: "AJ2QSY34B9"
     scripts:
       - name: Install dependencies
         script: |
+          echo "📦 Installing dependencies..."
           flutter pub get
           cd ios
           pod install
           cd ..
-      - name: Setup automatic iOS code signing
+      - name: Setup automatic code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
+          
+          # Decode the PRIVATE_KEY from Base64 to a valid PEM file
+          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
-          # Normalize line endings and remove trailing whitespace
-          echo "$PRIVATE_KEY" | sed 's/\r$//' | sed 's/[[:space:]]*$//' > /tmp/AuthKey.p8
-
-          # --- DEBUG INFORMATION ---
-          echo "🔹 First 3 lines of PEM key:"
-          head -n 3 /tmp/AuthKey.p8
-          echo "🔹 Last 3 lines of PEM key:"
-          tail -n 3 /tmp/AuthKey.p8
-          echo "🔹 Full line count:"
+          # Debug info
+          echo "🔹 First line of PEM key:"
+          head -n1 /tmp/AuthKey.p8
+          echo "🔹 Last line of PEM key:"
+          tail -n1 /tmp/AuthKey.p8
+          echo "🔹 Line count:"
           wc -l /tmp/AuthKey.p8
           echo "🔹 File type:"
           file /tmp/AuthKey.p8
-          echo "🔹 Show visible whitespace for first 5 lines:"
-          head -n 5 /tmp/AuthKey.p8 | sed -n l
-          echo "🔹 Hex dump of first 3 lines:"
-          head -n 3 /tmp/AuthKey.p8 | hexdump -C
-          echo "BUNDLE_ID: $BUNDLE_ID"
-          echo "ISSUER_ID: $ISSUER_ID"
-          echo "KEY_ID: $KEY_ID"
 
           # Validate BEGIN/END lines
           if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
@@ -65,10 +55,15 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-      - name: Build iOS IPA
+      - name: Build IPA
         script: |
+          #!/usr/bin/env bash
+          set -e
           echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
 
     artifacts:
       - build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect: {}
