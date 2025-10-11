@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect
+        - AppStoreConnect  # Should contain PRIVATE_KEY, ISSUER_ID, KEY_ID, BUNDLE_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -15,15 +15,15 @@ workflows:
           cd ios
           pod install
           cd ..
+
       - name: Setup automatic code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode Base64 private key safely
-          echo "$PRIVATE_KEY" | tr -d '\r\n' | base64 --decode > /tmp/AuthKey.p8
-          echo "" >> /tmp/AuthKey.p8  # ensure newline
+          # Write the PEM-encoded private key directly to a file
+          echo "$PRIVATE_KEY" > /tmp/AuthKey.p8
 
           # Verify output
           echo "Verifying private key header:"
@@ -33,7 +33,7 @@ workflows:
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # ✅ IMPORTANT: prefix private key with '@' to tell tool it's a file
+          # Fetch and create signing certificates & profiles
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -41,11 +41,13 @@ workflows:
             --private-key "@/tmp/AuthKey.p8" \
             --type IOS_APP_STORE \
             --create
+
       - name: Build IPA
         script: |
           #!/usr/bin/env bash
           set -e
           echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
+
     artifacts:
       - build/ios/ipa/*.ipa
