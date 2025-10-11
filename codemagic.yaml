@@ -11,8 +11,6 @@ workflows:
       groups:
         # 👇 Create this group in Codemagic UI and add:
         # PRIVATE_KEY (App Store Connect .p8 contents)
-        # APP_STORE_CONNECT_ISSUER_ID (optional backup)
-        # APP_STORE_CONNECT_KEY_IDENTIFIER (optional backup)
         - app_store_connect_credentials
 
     scripts:
@@ -65,3 +63,7 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+
+    integrations:
+      app_store_connect: Codemagic App Store Connect
+
