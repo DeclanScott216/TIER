@@ -19,7 +19,7 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Safely write the PEM key to disk preserving newlines
+          # Write the PEM key safely
           printf "%s" "$PRIVATE_KEY" | tr -d '\r' > /tmp/AuthKey.p8
 
           echo "Verifying private key header:"
@@ -30,7 +30,7 @@ workflows:
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Fetch signing certificates and provisioning profiles
+          # Fetch certificates and provisioning profiles from App Store Connect
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -48,7 +48,3 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/ipa/*.app
-      - /tmp/xcodebuild_logs/*.log
-
-    integrations:
-      apple_developer_portal: TIER
