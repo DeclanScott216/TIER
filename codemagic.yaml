@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect
+        - AppStoreConnect   # Your variable group for BUNDLE_ID, ISSUER_ID, KEY_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -22,8 +22,8 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
           
-          # Decode the PRIVATE_KEY from Base64 to a valid PEM file
-          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
+          # Write private key from environment variable
+          printf "%s\n" "$PRIVATE_KEY" > /tmp/AuthKey.p8
 
           # Debug info
           echo "🔹 First line of PEM key:"
@@ -32,19 +32,6 @@ workflows:
           tail -n1 /tmp/AuthKey.p8
           echo "🔹 Line count:"
           wc -l /tmp/AuthKey.p8
-          echo "🔹 File type:"
-          file /tmp/AuthKey.p8
-
-          # Validate BEGIN/END lines
-          if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
-            echo "ERROR: PEM key does not start with BEGIN PRIVATE KEY"
-            exit 1
-          fi
-          if ! tail -n1 /tmp/AuthKey.p8 | grep -q "END PRIVATE KEY"; then
-            echo "ERROR: PEM key does not end with END PRIVATE KEY"
-            exit 1
-          fi
-          echo "PEM key format looks correct ✅"
 
           # Fetch signing certificates & provisioning profiles
           app-store-connect fetch-signing-files \
@@ -54,7 +41,6 @@ workflows:
             --private-key "@/tmp/AuthKey.p8" \
             --type IOS_APP_STORE \
             --create
-
       - name: Build IPA
         script: |
           #!/usr/bin/env bash
@@ -67,3 +53,4 @@ workflows:
 
     publishing:
       app_store_connect: {}
+
