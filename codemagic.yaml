@@ -21,9 +21,9 @@ workflows:
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
-          
-          # Write private key from environment variable to file
-          printf "%s\n" "$PRIVATE_KEY" > /tmp/AuthKey.p8
+
+          # Decode the base64 PRIVATE_KEY safely into a file
+          echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
           # --- Debug output ---
           echo "🔹 First line of PEM key:"
@@ -53,6 +53,6 @@ workflows:
 
     publishing:
       app_store_connect:
-        api_key: $PRIVATE_KEY
+        api_key: $PRIVATE_KEY    # base64-encoded .p8 key
         key_id: $KEY_ID
         issuer_id: $ISSUER_ID
