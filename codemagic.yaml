@@ -1,26 +1,39 @@
 workflows:
-  ios-release:
-    name: iOS Release Build
+  ios_appstore:
+    name: iOS App Store Workflow
+    max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect # this matches your Codemagic variable group name
+        - AppStoreConnect        # Must exist in Codemagic → Environment variables
+      flutter: stable
+      xcode: latest
+      cocoapods: default
       vars:
         BUNDLE_ID: "com.elitelywell.tier"
         ISSUER_ID: "d3ffa311-f124-4a74-b0ad-e4884a873c75"
         KEY_ID: "AJ2QSY34B9"
-      xcode: latest
-    integrations:
-      app_store_connect: TIER
     scripts:
-      - name: Setup automatic code signing
+      - name: Install dependencies
+        script: |
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
+      - name: Setup automatic iOS code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Safely write the PEM key, preserving line breaks and removing carriage returns
-          printf "%s" "$PRIVATE_KEY" | tr -d '\r' > /tmp/AuthKey.p8
+          # Safely write the PEM key using heredoc (preserves newlines)
+          cat <<'EOF' > /tmp/AuthKey.p8
+          $PRIVATE_KEY
+          EOF
 
+          # Convert escaped \n to real newlines (Codemagic may escape them)
+          sed -i 's/\\n/\n/g' /tmp/AuthKey.p8
+
+          # Debug information
           echo "Verifying private key header:"
           head -n 6 /tmp/AuthKey.p8
           echo "File type:"
@@ -29,6 +42,7 @@ workflows:
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
+          # Fetch and create signing certificates & profiles
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -36,16 +50,16 @@ workflows:
             --private-key "@/tmp/AuthKey.p8" \
             --type IOS_APP_STORE \
             --create
-      - name: Build IPA
+      - name: Build iOS IPA
         script: |
+          echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
-      - name: Export IPA
-        script: |
-          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner --export-method app-store
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_app_store: true
+        integration: TIER    # 👈 Must match your Apple Developer Portal integration name
+        submit_to_testflight: false
+
 
