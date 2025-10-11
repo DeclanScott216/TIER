@@ -24,16 +24,30 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode the base64 PRIVATE_KEY into a file
+          echo "🔹 Decoding PRIVATE_KEY into /tmp/AuthKey.p8"
           echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
-          # --- Debug output ---
-          echo "🔹 First line of PEM key:"
+          echo "🔹 Debug info for PEM key:"
+          echo "Full content of PEM key:"
+          cat /tmp/AuthKey.p8
+          echo "First line:"
           head -n1 /tmp/AuthKey.p8
-          echo "🔹 Last line of PEM key:"
-          tail -n1 /tmp/AuthKey.p8
-          echo "🔹 Line count:"
+          echo "Second line:"
+          head -n2 /tmp/AuthKey.p8 | tail -n1
+          echo "Third line:"
+          head -n3 /tmp/AuthKey.p8 | tail -n1
+          echo "Last 3 lines:"
+          tail -n3 /tmp/AuthKey.p8
+          echo "Line count:"
           wc -l /tmp/AuthKey.p8
+          echo "Show visible whitespace for all lines:"
+          cat -n /tmp/AuthKey.p8 | sed -n l
+          echo "Hex dump of entire key:"
+          hexdump -C /tmp/AuthKey.p8
+
+          echo "BUNDLE_ID: $BUNDLE_ID"
+          echo "ISSUER_ID: $ISSUER_ID"
+          echo "KEY_ID: $KEY_ID"
 
           # Validate BEGIN/END lines
           if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
@@ -46,7 +60,7 @@ workflows:
           fi
           echo "PEM key format looks correct ✅"
 
-          # Fetch signing certificates & provisioning profiles
+          echo "🔹 Running app-store-connect fetch-signing-files"
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
