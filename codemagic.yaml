@@ -1,25 +1,24 @@
 workflows:
   ios-release:
     name: iOS Release Build
-    max_build_duration: 60
     environment:
-      flutter: stable
-      xcode: 16.4
+      groups:
+        - AppStoreConnect # this matches your Codemagic variable group name
       vars:
         BUNDLE_ID: "com.elitelywell.tier"
         ISSUER_ID: "d3ffa311-f124-4a74-b0ad-e4884a873c75"
         KEY_ID: "AJ2QSY34B9"
-      groups:
-        - app_store_connect_credentials  # contains PRIVATE_KEY
-
+      xcode: latest
+    integrations:
+      app_store_connect: TIER
     scripts:
-      - name: 🔐 Setup automatic iOS code signing
+      - name: Setup automatic code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Write the PEM key safely
+          # Safely write the PEM key, preserving line breaks and removing carriage returns
           printf "%s" "$PRIVATE_KEY" | tr -d '\r' > /tmp/AuthKey.p8
 
           echo "Verifying private key header:"
@@ -30,7 +29,6 @@ workflows:
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Fetch certificates and provisioning profiles from App Store Connect
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -38,13 +36,16 @@ workflows:
             --private-key "@/tmp/AuthKey.p8" \
             --type IOS_APP_STORE \
             --create
-
-      - name: 🧱 Build release IPA
+      - name: Build IPA
         script: |
-          flutter clean
-          flutter pub get
           flutter build ipa --release --no-codesign
-
+      - name: Export IPA
+        script: |
+          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner --export-method app-store
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.app
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_app_store: true
+
