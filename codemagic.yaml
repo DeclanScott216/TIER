@@ -4,10 +4,11 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect  # Should contain PRIVATE_KEY, ISSUER_ID, KEY_ID, BUNDLE_ID
+        - AppStoreConnect  # contains PRIVATE_KEY, ISSUER_ID, KEY_ID, BUNDLE_ID
       flutter: stable
       xcode: latest
       cocoapods: default
+
     scripts:
       - name: Install dependencies
         script: |
@@ -22,18 +23,19 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Write the PEM-encoded private key directly to a file
-          echo "$PRIVATE_KEY" > /tmp/AuthKey.p8
+          # Safely write the PEM key, preserving line breaks and removing carriage returns
+          printf "%s" "$PRIVATE_KEY" | tr -d '\r' > /tmp/AuthKey.p8
 
-          # Verify output
+          # Debug information (optional)
           echo "Verifying private key header:"
           head -n 6 /tmp/AuthKey.p8
-
+          echo "File type:"
+          file /tmp/AuthKey.p8
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "ISSUER_ID: $ISSUER_ID"
           echo "KEY_ID: $KEY_ID"
 
-          # Fetch and create signing certificates & profiles
+          # Fetch and create signing certificates & provisioning profiles
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -49,5 +51,26 @@ workflows:
           echo "📦 Building iOS IPA..."
           flutter build ipa --release --no-codesign
 
+      - name: Export signed IPA
+        script: |
+          #!/usr/bin/env bash
+          set -e
+          echo "🔏 Exporting signed IPA..."
+          xcode-project use-profiles
+          xcode-project build-ipa --workspace "ios/Runner.xcworkspace" --scheme "Runner" --archive-path "build/ios/archive.xcarchive"
+
+      - name: Upload to TestFlight
+        script: |
+          #!/usr/bin/env bash
+          set -e
+          echo "☁️ Uploading IPA to TestFlight..."
+          app-store-connect upload \
+            --issuer-id "$ISSUER_ID" \
+            --key-id "$KEY_ID" \
+            --private-key "@/tmp/AuthKey.p8" \
+            --path "build/ios/ipa/Runner.ipa" \
+            --verbose
+
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
