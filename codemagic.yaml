@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - AppStoreConnect   # Contains PRIVATE_KEY (base64), KEY_ID, ISSUER_ID, BUNDLE_ID
+        - AppStoreConnect   # contains PRIVATE_KEY (base64), KEY_ID, ISSUER_ID, BUNDLE_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -24,7 +24,7 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode the base64-encoded private key into a file
+          # Decode the base64-encoded private key into a file for verification
           echo "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
           echo "✅ Decoded AuthKey.p8 created at /tmp/AuthKey.p8"
 
@@ -61,12 +61,12 @@ workflows:
           echo "  ISSUER_ID: $ISSUER_ID"
           echo "  KEY_ID: $KEY_ID"
 
-          # Fetch signing certificates and provisioning profiles
+          # Fetch signing certificates and provisioning profiles using base64 key directly
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
             --key-id "$KEY_ID" \
-            --private-key "/tmp/AuthKey.p8" \
+            --private-key "$PRIVATE_KEY" \
             --type IOS_APP_STORE \
             --create
 
