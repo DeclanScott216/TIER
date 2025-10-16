@@ -2,6 +2,7 @@ workflows:
   ios_appstore:
     name: iOS App Store Workflow
     max_build_duration: 60
+
     environment:
       vars:
         BUNDLE_ID: "com.elitelywell.tier"
@@ -28,8 +29,8 @@ workflows:
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode base64 key into PEM safely (avoids line loss)
-          printf "%s" "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
+          # Decode base64 key into PEM safely (avoids line loss and duplicates)
+          printf "%s" "$PRIVATE_KEY" | base64 --decode | awk '!seen[$0]++' > /tmp/AuthKey.p8
           echo "✅ AuthKey.p8 created at /tmp/AuthKey.p8"
 
           # Debug sanity checks
@@ -39,7 +40,7 @@ workflows:
           wc -l /tmp/AuthKey.p8
           echo "----------------------"
 
-          # Validate format
+          # Validate PEM format
           if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
             echo "❌ PEM key invalid"
             exit 1
@@ -50,7 +51,7 @@ workflows:
           fi
           echo "✅ PEM structure good"
 
-          # Use decoded PEM to fetch signing files
+          # Fetch signing files
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
