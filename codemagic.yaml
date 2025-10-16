@@ -1,32 +1,56 @@
 workflows:
-  ios-release:
-    name: iOS Release Build
+  ios_appstore:
+    name: iOS App Store Workflow
+    max_build_duration: 60
     environment:
-      groups:
-        - appstore_credentials    # must contain PRIVATE_KEY, ISSUER_ID, KEY_ID
       vars:
-        BUNDLE_ID: "com.yourcompany.yourapp"
+        BUNDLE_ID: "com.elitelywell.tier"
+        ISSUER_ID: "d3ffa311-f124-4a74-b0ad-e4884a873c75"
+        KEY_ID: "44J26692FU"
+        PRIVATE_KEY: |
+          LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRZ3lYKzhVVFc1dTkxeE9Yc0MKazdQWk5lTThtRkhQTzY5WmR4aFR2WUVJeENTZ0NnWUlLb1pJemowREFRZWhSQU5DQUFUNGNzVFY3MjI2NDVhcwpDZTNYZWxtaHhYZm1aSWNsT1BEaUppSDRFelZ2YlZzbGx4eTU0bUszRVhIbkRRd0RLM3FGTCtYUG1TWDVPUUc1CjdkZ0lMeHZICi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0=
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
     scripts:
+      - name: Install dependencies
+        script: |
+          echo "📦 Installing dependencies..."
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
+
       - name: Setup automatic iOS code signing
         script: |
           #!/usr/bin/env bash
           set -e
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Decode your base64 key into a PEM
+          # Decode base64 key into PEM safely (avoids line loss)
           printf "%s" "$PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
           echo "✅ AuthKey.p8 created at /tmp/AuthKey.p8"
 
-          head -n2 /tmp/AuthKey.p8
-          tail -n2 /tmp/AuthKey.p8
+          # Debug sanity checks
+          echo "----- FILE CHECK -----"
+          head -n5 /tmp/AuthKey.p8
+          tail -n5 /tmp/AuthKey.p8
           wc -l /tmp/AuthKey.p8
+          echo "----------------------"
 
-          if ! grep -q "BEGIN PRIVATE KEY" /tmp/AuthKey.p8; then
-            echo "❌ Invalid PEM key"
+          # Validate format
+          if ! head -n1 /tmp/AuthKey.p8 | grep -q "BEGIN PRIVATE KEY"; then
+            echo "❌ PEM key invalid"
+            exit 1
+          fi
+          if ! tail -n1 /tmp/AuthKey.p8 | grep -q "END PRIVATE KEY"; then
+            echo "❌ PEM key incomplete"
             exit 1
           fi
           echo "✅ PEM structure good"
 
+          # Use decoded PEM to fetch signing files
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -35,19 +59,20 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-      - name: Flutter clean and build
+      - name: Build signed iOS IPA
         script: |
-          flutter clean
-          flutter pub get
-          flutter build ipa --release --no-codesign
+          echo "🚀 Building signed IPA for App Store..."
+          flutter build ipa --release
+
+      - name: Upload to App Store Connect
+        script: |
+          echo "📤 Uploading signed IPA to TestFlight..."
+          app-store-connect publish \
+            --path "build/ios/ipa/*.ipa" \
+            --issuer-id "$ISSUER_ID" \
+            --key-id "$KEY_ID" \
+            --private-key /tmp/AuthKey.p8
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.dSYM.zip
-
-    publishing:
-      app_store_connect:
-        api_key:
-          private_key: $PRIVATE_KEY
-          key_id: $KEY_ID
-          issuer_id: $ISSUER_ID
+      - /tmp/AuthKey.p8
