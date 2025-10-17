@@ -4,9 +4,8 @@ workflows:
     max_build_duration: 60
 
     environment:
-      # Import your secure variables from this group in Codemagic UI:
       groups:
-        - AppStoreConnect    # must include PRIVATE_KEY, KEY_ID, ISSUER_ID, BUNDLE_ID, APP_STORE_CONNECT_APPLE_ID
+        - AppStoreConnect  # contains PRIVATE_KEY, KEY_ID, ISSUER_ID, BUNDLE_ID, APP_STORE_CONNECT_APPLE_ID
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -14,7 +13,7 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          echo "📦 Installing dependencies..."
+          echo "📦 Installing Flutter dependencies..."
           flutter pub get
           cd ios || exit 1
           pod install --repo-update || true
@@ -26,17 +25,17 @@ workflows:
           set -euo pipefail
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Ensure required env vars are present (fail early if not)
-          : "${PRIVATE_KEY:?PRIVATE_KEY is not set in environment/group}"
-          : "${KEY_ID:?KEY_ID is not set in environment/group}"
-          : "${ISSUER_ID:?ISSUER_ID is not set in environment/group}"
-          : "${BUNDLE_ID:?BUNDLE_ID is not set in environment/group}"
+          # Ensure required environment variables
+          : "${PRIVATE_KEY:?PRIVATE_KEY is not set}"
+          : "${KEY_ID:?KEY_ID is not set}"
+          : "${ISSUER_ID:?ISSUER_ID is not set}"
+          : "${BUNDLE_ID:?BUNDLE_ID is not set}"
 
-          # Decode base64 key safely and clean it (no duplicates, no CRLF)
+          # Decode base64 PEM and clean duplicates/CRLF
           printf "%s" "$PRIVATE_KEY" | base64 --decode | awk '!seen[$0]++' | sed 's/\r$//' > /tmp/AuthKey.p8
           echo "✅ /tmp/AuthKey.p8 created"
 
-          # Debug sanity checks
+          # Debug checks
           echo "----- FILE CHECK (first/last 6 lines) -----"
           head -n6 /tmp/AuthKey.p8 || true
           echo "..."
@@ -44,37 +43,38 @@ workflows:
           echo "File size (bytes): $(wc -c < /tmp/AuthKey.p8)"
           echo "-------------------------------------------"
 
-          # Validate PEM format (BEGIN/END must exist and only once)
+          # Validate structure
           if ! grep -q "^-----BEGIN PRIVATE KEY-----" /tmp/AuthKey.p8; then
-            echo "❌ ERROR: PEM key does not contain BEGIN PRIVATE KEY"
+            echo "❌ Missing BEGIN PRIVATE KEY line"
             exit 1
           fi
           if ! grep -q "^-----END PRIVATE KEY-----" /tmp/AuthKey.p8; then
-            echo "❌ ERROR: PEM key does not contain END PRIVATE KEY"
+            echo "❌ Missing END PRIVATE KEY line"
             exit 1
           fi
 
-          # Keep only the first PEM block (in case of accidental duplication)
+          # Keep only first PEM block (defensive)
           awk '/-----BEGIN PRIVATE KEY-----/{p=1} p{print} /-----END PRIVATE KEY-----/{p=0; exit}' /tmp/AuthKey.p8 > /tmp/AuthKey_clean.p8
           mv /tmp/AuthKey_clean.p8 /tmp/AuthKey.p8
+
+          # Normalize newlines
           sed -i '' -e 's/\r$//' /tmp/AuthKey.p8 2>/dev/null || sed -i -e 's/\r$//' /tmp/AuthKey.p8 2>/dev/null || true
 
-          echo "✅ Final PEM content:"
+          echo "✅ Final PEM preview:"
           sed -n '1,10p' /tmp/AuthKey.p8
           echo "..."
-          sed -n ':a;N;$!ba;s/\n/\\n/g;p' /tmp/AuthKey.p8 >/dev/null 2>&1 || true
-          echo "✅ PEM ready for signing"
 
-          # Optional: test parsing with OpenSSL (if available)
+          # Verify PEM with OpenSSL if available
           if command -v openssl >/dev/null 2>&1; then
             if openssl pkcs8 -in /tmp/AuthKey.p8 -nocrypt -inform PEM -out /dev/null 2>/dev/null; then
               echo "✅ OpenSSL parsed key OK"
             else
-              echo "❌ OpenSSL failed to parse key (will still try app-store-connect CLI)"
+              echo "⚠️ OpenSSL couldn't parse key (will proceed anyway)"
             fi
           fi
 
-          # Fetch signing certificates/profiles from App Store Connect
+          # Fetch signing certificates and provisioning profiles
+          echo "📡 Fetching signing files from App Store Connect..."
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
@@ -83,16 +83,14 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-      - name: Build signed iOS IPA
+      - name: Build signed IPA
         script: |
-          # Build signed IPA: Flutter + Xcode will use the downloaded profiles/certs
-          echo "🚀 Building iOS IPA..."
-          flutter build ipa --release
+          echo "🚀 Building iOS release IPA..."
+          flutter build ipa --release --no-codesign
 
-      - name: Publish to App Store Connect (TestFlight)
+      - name: Upload to App Store Connect
         script: |
-          echo "📤 Uploading signed IPA to TestFlight (app-store-connect CLI)..."
-          # app-store-connect publish accepts a path; use wildcard or explicit file
+          echo "📤 Uploading IPA to TestFlight..."
           app-store-connect publish \
             --path "build/ios/ipa/*.ipa" \
             --issuer-id "$ISSUER_ID" \
