@@ -1,58 +1,35 @@
 workflows:
-  ios-release:
-    name: iOS Manual Signing Build
-    max_build_duration: 60
-    instance_type: mac_mini_m1
-
+  ios-manual-signing:
+    name: iOS Manual Signing
     environment:
-      flutter: stable
-      xcode: latest
       vars:
-        BUNDLE_ID: "com.elitelywell.tier" # <-- replace this
-        CERTIFICATE_P12: Encrypted(...)       # uploaded via Codemagic UI
-        CERTIFICATE_PASSWORD: Encrypted(...)  # your export password
-        PROVISIONING_PROFILE_BASE64: Encrypted(...) # your .mobileprovision encoded as base64
-        APP_STORE_CONNECT_APPLE_ID: "dwscott216@gmail.com"
-      groups:
-        - keystore_credentials
-
-    cache:
-      cache_paths:
-        - $FLUTTER_ROOT/.pub-cache
-
+        BUNDLE_ID: "com.elitelywell.tier"
+        P12_PASSWORD: Encrypted  # set in Codemagic env vars
+        # P12_BASE64 and PROVISIONING_PROFILE_BASE64 are also set in Codemagic env vars
+      xcode: latest
+      cocoapods: default
+      flutter: stable
     scripts:
+      - name: Decode .p12 and .mobileprovision from env
+        script: |
+          echo "📦 Decoding certificates and provisioning profiles..."
+          echo "$P12_BASE64" | base64 --decode > ios_distribution.p12
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > TIER.mobileprovision
+      - name: Setup manual signing
+        script: |
+          echo "🔐 Installing certificate and provisioning profile..."
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp TIER.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          security create-keychain -p "" build.keychain
+          security import ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s ~/Library/Keychains/build.keychain
+          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
       - name: Install dependencies
         script: |
           flutter pub get
-
-      - name: Decode and install signing certificate
+          pod install --project-directory=ios
+      - name: Build iOS app
         script: |
-          echo "📦 Setting up iOS distribution certificate..."
-          echo "$CERTIFICATE_P12" | base64 --decode > ios_distribution.p12
-          security import ios_distribution.p12 -P "$CERTIFICATE_PASSWORD" -A
-          echo "✅ Certificate imported successfully"
-
-      - name: Decode and install provisioning profile
-        script: |
-          echo "📱 Installing provisioning profile..."
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > provisioning.mobileprovision
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          PROFILE_UUID=$(grep -a -o '<key>UUID</key><string>.*</string>' provisioning.mobileprovision | head -1 | sed -E 's/.*<string>(.*)<\/string>.*/\1/')
-          cp provisioning.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
-          echo "✅ Provisioning profile installed: $PROFILE_UUID"
-
-      - name: Build iOS IPA
-        script: |
-          echo "🏗️ Building iOS IPA..."
-          flutter build ipa --release --no-codesign
-          echo "✅ Flutter build completed"
-
+          flutter build ipa --release --export-options-plist ios/ExportOptions.plist
     artifacts:
-      - build/**/outputs/**/*.ipa
       - build/ios/ipa/*.ipa
-      - flutter_drive.log
-
-    publishing:
-      email:
-        recipients:
-          - dwscott216@gmail.com
