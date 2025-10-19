@@ -1,35 +1,58 @@
 workflows:
-  ios-manual-signing:
-    name: iOS Manual Signing
+  ios_manual_signing:
+    name: iOS Build (Manual Signing)
+    max_build_duration: 60
     environment:
-      vars:
-        BUNDLE_ID: "com.elitelywell.tier"
-        P12_PASSWORD: Encrypted  # set in Codemagic env vars
-        # P12_BASE64 and PROVISIONING_PROFILE_BASE64 are also set in Codemagic env vars
+      flutter: stable
       xcode: latest
       cocoapods: default
-      flutter: stable
+      vars:
+        P12_BASE64: Encrypted
+        P12_PASSWORD: Encrypted
+        PROVISIONING_PROFILE_BASE64: Encrypted
     scripts:
-      - name: Decode .p12 and .mobileprovision from env
-        script: |
-          echo "📦 Decoding certificates and provisioning profiles..."
-          echo "$P12_BASE64" | base64 --decode > ios_distribution.p12
-          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > TIER.mobileprovision
-      - name: Setup manual signing
-        script: |
-          echo "🔐 Installing certificate and provisioning profile..."
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp TIER.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
-          security create-keychain -p "" build.keychain
-          security import ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -s ~/Library/Keychains/build.keychain
-          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
       - name: Install dependencies
         script: |
+          flutter precache
           flutter pub get
-          pod install --project-directory=ios
-      - name: Build iOS app
+          cd ios
+          pod repo update
+          pod install
+          cd ..
+      - name: Decode iOS signing files
         script: |
-          flutter build ipa --release --export-options-plist ios/ExportOptions.plist
+          mkdir -p ~/ios_signing
+          echo "$P12_BASE64" | base64 --decode > ~/ios_signing/ios_distribution.p12
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > ~/ios_signing/TIER.mobileprovision
+      - name: Setup keychain
+        script: |
+          security create-keychain -p "" build.keychain
+          security import ~/ios_signing/ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s ~/Library/Keychains/build.keychain
+          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
+          security set-keychain-settings -t 3600 -l ~/Library/Keychains/build.keychain
+      - name: Copy provisioning profile
+        script: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp ~/ios_signing/TIER.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+      - name: Build iOS
+        script: |
+          flutter build ios --release --no-codesign
+          xcodebuild -workspace ios/Runner.xcworkspace \
+                     -scheme Runner \
+                     -configuration Release \
+                     -archivePath $CM_BUILD_DIR/build/Runner.xcarchive \
+                     CODE_SIGN_STYLE=Manual \
+                     DEVELOPMENT_TEAM=<YOUR_TEAM_ID> \
+                     PROVISIONING_PROFILE_SPECIFIER=TIER \
+                     PRODUCT_BUNDLE_IDENTIFIER=<YOUR_BUNDLE_ID> \
+                     clean archive
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+                     -archivePath $CM_BUILD_DIR/build/Runner.xcarchive \
+                     -exportPath $CM_BUILD_DIR/build/ \
+                     -exportOptionsPlist ios/ExportOptions.plist
     artifacts:
-      - build/ios/ipa/*.ipa
+      - build/*.ipa
+      - build/ios/Runner.app.dSYM
