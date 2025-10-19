@@ -5,7 +5,7 @@ workflows:
 
     environment:
       groups:
-        - AppStoreConnect  # contains PRIVATE_KEY, KEY_ID, ISSUER_ID, BUNDLE_ID, APP_STORE_CONNECT_APPLE_ID
+        - AppStoreConnect   # must include PRIVATE_KEY (base64), KEY_ID, ISSUER_ID, BUNDLE_ID, APP_STORE_CONNECT_APPLE_ID (optional)
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -13,7 +13,9 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          echo "📦 Installing Flutter dependencies..."
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "📦 Installing Flutter & iOS dependencies..."
           flutter pub get
           cd ios || exit 1
           pod install --repo-update || true
@@ -25,78 +27,97 @@ workflows:
           set -euo pipefail
           echo "🔐 Setting up automatic iOS code signing..."
 
-          # Ensure required environment variables
-          : "${PRIVATE_KEY:?PRIVATE_KEY is not set}"
-          : "${KEY_ID:?KEY_ID is not set}"
-          : "${ISSUER_ID:?ISSUER_ID is not set}"
-          : "${BUNDLE_ID:?BUNDLE_ID is not set}"
+          # Required env vars (fail early)
+          : "${PRIVATE_KEY:?PRIVATE_KEY is not set in env/group}"
+          : "${KEY_ID:?KEY_ID is not set in env/group}"
+          : "${ISSUER_ID:?ISSUER_ID is not set in env/group}"
+          : "${BUNDLE_ID:?BUNDLE_ID is not set in env/group}"
 
-          # Decode base64 PEM and clean duplicates/CRLF
-          printf "%s" "$PRIVATE_KEY" | base64 --decode | awk '!seen[$0]++' | sed 's/\r$//' > /tmp/AuthKey.p8
-          echo "✅ /tmp/AuthKey.p8 created"
+          # Decode base64 safely and write the PEM to the project working directory
+          # Use printf to preserve the exact base64 payload (avoid echo mangling newlines)
+          printf "%s" "$PRIVATE_KEY" | tr -d '\r' | tr -d '\n' | base64 --decode > ./AuthKey.p8 || {
+            echo "❌ Failed to decode PRIVATE_KEY; trying relaxed decode..."
+            printf "%s" "$PRIVATE_KEY" | base64 --decode > ./AuthKey.p8
+          }
 
-          # Debug checks
-          echo "----- FILE CHECK (first/last 6 lines) -----"
-          head -n6 /tmp/AuthKey.p8 || true
-          echo "..."
-          tail -n6 /tmp/AuthKey.p8 || true
-          echo "File size (bytes): $(wc -c < /tmp/AuthKey.p8)"
-          echo "-------------------------------------------"
+          # Defensive cleaning: remove duplicate lines, normalize CRLF, ensure EOF newline
+          awk '!seen[$0]++' ./AuthKey.p8 | sed 's/\r$//' > ./AuthKey.clean.p8
+          mv ./AuthKey.clean.p8 ./AuthKey.p8
+          # ensure newline at EOF
+          if [ -n "$(tail -c1 ./AuthKey.p8)" ]; then echo >> ./AuthKey.p8; fi
+
+          echo "✅ ./AuthKey.p8 created (workspace path)"
+
+          # Quick debug/preview (first + last lines) - safe to show in logs
+          echo "----- PEM PREVIEW (head) -----"
+          head -n6 ./AuthKey.p8 || true
+          echo "------------------------------"
+          echo "----- PEM PREVIEW (tail) -----"
+          tail -n6 ./AuthKey.p8 || true
+          echo "------------------------------"
+          echo "File size (bytes): $(wc -c < ./AuthKey.p8)"
 
           # Validate structure
-          if ! grep -q "^-----BEGIN PRIVATE KEY-----" /tmp/AuthKey.p8; then
-            echo "❌ Missing BEGIN PRIVATE KEY line"
+          if ! grep -q "^-----BEGIN PRIVATE KEY-----" ./AuthKey.p8; then
+            echo "❌ Missing BEGIN PRIVATE KEY"
             exit 1
           fi
-          if ! grep -q "^-----END PRIVATE KEY-----" /tmp/AuthKey.p8; then
-            echo "❌ Missing END PRIVATE KEY line"
+          if ! grep -q "^-----END PRIVATE KEY-----" ./AuthKey.p8; then
+            echo "❌ Missing END PRIVATE KEY"
             exit 1
           fi
 
           # Keep only first PEM block (defensive)
-          awk '/-----BEGIN PRIVATE KEY-----/{p=1} p{print} /-----END PRIVATE KEY-----/{p=0; exit}' /tmp/AuthKey.p8 > /tmp/AuthKey_clean.p8
-          mv /tmp/AuthKey_clean.p8 /tmp/AuthKey.p8
+          awk '/-----BEGIN PRIVATE KEY-----/{p=1} p{print} /-----END PRIVATE KEY-----/{p=0; exit}' ./AuthKey.p8 > ./AuthKey.first.p8
+          mv ./AuthKey.first.p8 ./AuthKey.p8
 
-          # Normalize newlines
-          sed -i '' -e 's/\r$//' /tmp/AuthKey.p8 2>/dev/null || sed -i -e 's/\r$//' /tmp/AuthKey.p8 2>/dev/null || true
+          # Ensure UTF-8 (drop BOM if any) - best effort
+          if command -v iconv >/dev/null 2>&1; then
+            iconv -f utf-8 -t utf-8 -c ./AuthKey.p8 -o ./AuthKey.tmp.p8 && mv ./AuthKey.tmp.p8 ./AuthKey.p8 || true
+          fi
 
-          echo "✅ Final PEM preview:"
-          sed -n '1,10p' /tmp/AuthKey.p8
-          echo "..."
-
-          # Verify PEM with OpenSSL if available
+          # Optional: check with openssl if available
           if command -v openssl >/dev/null 2>&1; then
-            if openssl pkcs8 -in /tmp/AuthKey.p8 -nocrypt -inform PEM -out /dev/null 2>/dev/null; then
-              echo "✅ OpenSSL parsed key OK"
+            if openssl pkcs8 -in ./AuthKey.p8 -nocrypt -inform PEM -out /dev/null 2>/dev/null; then
+              echo "✅ OpenSSL parsed the key OK"
             else
-              echo "⚠️ OpenSSL couldn't parse key (will proceed anyway)"
+              echo "⚠️ OpenSSL could not parse the key (will still try app-store-connect)"
             fi
           fi
 
-          # Fetch signing certificates and provisioning profiles
-          echo "📡 Fetching signing files from App Store Connect..."
+          echo "📡 Fetching signing certificates & provisioning profiles from App Store Connect..."
+          # Pass path that exists in the current working directory (not /tmp) so CLI can access it reliably
+          # Note: app-store-connect CLI tolerates either inline PEM or file path; using file path here in same step
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
             --issuer-id "$ISSUER_ID" \
             --key-id "$KEY_ID" \
-            --private-key /tmp/AuthKey.p8 \
+            --private-key ./AuthKey.p8 \
             --type IOS_APP_STORE \
             --create
 
-      - name: Build signed IPA
+      - name: Build iOS IPA
         script: |
-          echo "🚀 Building iOS release IPA..."
-          flutter build ipa --release --no-codesign
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "🚀 Building iOS IPA (signed by Xcode using downloaded profiles)..."
+          # Remove --no-codesign if you want Xcode to sign using the downloaded profiles/certs
+          flutter build ipa --release
 
-      - name: Upload to App Store Connect
+      - name: Upload to App Store Connect (TestFlight)
         script: |
-          echo "📤 Uploading IPA to TestFlight..."
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "📤 Publishing IPA to TestFlight via app-store-connect CLI..."
+          # Read key to inline variable (app-store-connect supports both file path and inline; inline is robust)
+          PRIVATE_KEY_CONTENT="$(cat ./AuthKey.p8)"
           app-store-connect publish \
             --path "build/ios/ipa/*.ipa" \
             --issuer-id "$ISSUER_ID" \
             --key-id "$KEY_ID" \
-            --private-key /tmp/AuthKey.p8
+            --private-key "$PRIVATE_KEY_CONTENT"
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/AuthKey.p8
+      - ./AuthKey.p8
+
