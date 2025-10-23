@@ -1,31 +1,36 @@
 workflows:
-  ios-manual-signing:
-    name: iOS Manual Signing
-    max_build_duration: 60
+  ios-release:
+    name: iOS Release Build
     environment:
+      vars:
+        BUNDLE_ID: "com.elitelywell.tier"
+        TEAM_ID: "YOUR_TEAM_ID_HERE" # from developer.apple.com/account
       flutter: stable
       xcode: latest
-      vars:
-        P12_PASSWORD: Encrypted(...)
-        P12_BASE64: Encrypted(...)
-        PROVISIONING_PROFILE_BASE64: Encrypted(...)
-        BUNDLE_ID: com.elitelywell.tier
-        TEAM_ID: C9M638LGTP   # <-- your Apple Team ID here
     scripts:
-      - name: Decode provisioning profile
+      - name: Decode certificates and profiles
         script: |
-          echo $PROVISIONING_PROFILE_BASE64 | base64 --decode > /tmp/TIER.mobileprovision
-          echo $P12_BASE64 | base64 --decode > /tmp/ios_distribution.p12
-      - name: Install Flutter dependencies
+          echo "$P12_BASE64" | base64 --decode > ios_distribution.p12
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > TIER.mobileprovision
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp TIER.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+          security create-keychain -p "" build.keychain
+          security import ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s ~/Library/Keychains/build.keychain
+          security default-keychain -s ~/Library/Keychains/build.keychain
+          security unlock-keychain -p "" ~/Library/Keychains/build.keychain
+          security set-key-partition-list -S apple-tool:,apple: -k "" ~/Library/Keychains/build.keychain
+
+      - name: Get dependencies
         script: |
           flutter pub get
-          flutter precache
-      - name: Install CocoaPods dependencies
-        script: |
           cd ios
-          pod repo update
-          pod install
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
           cd ..
+
       - name: Build iOS
         script: |
           flutter build ios --release --no-codesign
@@ -33,10 +38,8 @@ workflows:
                      -scheme Runner \
                      -configuration Release \
                      -archivePath $CM_BUILD_DIR/build/Runner.xcarchive \
-                     CODE_SIGN_STYLE=Manual \
                      DEVELOPMENT_TEAM=$TEAM_ID \
                      PROVISIONING_PROFILE_SPECIFIER=TIER \
                      PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID \
+                     CODE_SIGN_STYLE=Manual \
                      clean archive
-    artifacts:
-      - build/ios/Runner.xcarchive
