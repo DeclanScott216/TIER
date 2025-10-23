@@ -4,7 +4,7 @@ workflows:
     environment:
       vars:
         BUNDLE_ID: "com.elitelywell.tier"
-        TEAM_ID: "YOUR_TEAM_ID_HERE" # from developer.apple.com/account
+        TEAM_ID: "C9M638LGTP" # from developer.apple.com/account
       flutter: stable
       xcode: latest
     scripts:
