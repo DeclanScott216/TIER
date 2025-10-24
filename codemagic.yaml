@@ -1,19 +1,21 @@
 workflows:
   ios-release:
-    name: iOS Release Build
+    name: iOS Release
     environment:
       groups:
-        - AppStoreConnect  # contains P12_BASE64, P12_PASSWORD, PROVISIONING_PROFILE_BASE64
+        - AppStoreConnect
       vars:
-        XCODE_WORKSPACE: "Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
+        APP_BUNDLE_ID: "com.elitelywell.tier"
         TEAM_ID: "C9M638LGTP"
-        APP_STORE_APPLE_ID: "6753337719"
+      flutter: stable
       xcode: latest
-      cocoapods: default
 
     scripts:
-      - name: Decode certificates and profiles
+      - name: Install dependencies
+        script: |
+          flutter pub get
+
+      - name: Decode certificates and provisioning profile
         script: |
           echo "$P12_BASE64" | base64 --decode > ios_distribution.p12
           echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > TIER.mobileprovision
@@ -22,68 +24,24 @@ workflows:
           cp TIER.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
 
           security create-keychain -p "" build.keychain
-          security import ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign || exit 1
+          security import ios_distribution.p12 -k ~/Library/Keychains/build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security list-keychains -s ~/Library/Keychains/build.keychain
           security default-keychain -s ~/Library/Keychains/build.keychain
           security unlock-keychain -p "" ~/Library/Keychains/build.keychain
           security set-key-partition-list -S apple-tool:,apple: -k "" ~/Library/Keychains/build.keychain
 
-      - name: Install Flutter dependencies
+      - name: Build iOS release IPA
         script: |
-          flutter clean
-          flutter pub get
+          flutter build ipa --release \
+            --no-codesign
 
-      - name: Build archive
+      - name: Code sign the IPA manually
         script: |
-          xcodebuild \
-            -workspace "$XCODE_WORKSPACE" \
-            -scheme "$XCODE_SCHEME" \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath $PWD/build/Runner.xcarchive \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Manual \
-            clean archive | xcpretty
-
-      - name: Export IPA
-        script: |
-          cat > ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>${TEAM_ID}</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.elitelywell.tier</key>
-              <string>TIER</string>
-            </dict>
-            <key>compileBitcode</key>
-            <false/>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
           xcodebuild -exportArchive \
-            -archivePath $PWD/build/Runner.xcarchive \
-            -exportPath $PWD/build/ipa \
-            -exportOptionsPlist ExportOptions.plist \
-            -allowProvisioningUpdates | xcpretty
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates
 
     artifacts:
-      - build/ipa/*.ipa
-
-    publishing:
-      app_store_connect:
-        apple_id: $APP_STORE_APPLE_ID
-        submit_to_testflight: true
-
+      - build/ios/ipa/*.ipa
